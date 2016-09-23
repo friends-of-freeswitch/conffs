@@ -86,6 +86,40 @@ class ConfigManager(object):
         log.debug("freeswitch.xml commit took {} seconds"
                   .format(time.time() - now))
 
+    def sofia_status(self):
+        """Return status data from sofia in a nicely organized dict.
+        """
+        # remove '===' "lines"
+        lines = [
+            line for line in self.fscli('sofia', 'status').splitlines()
+            if '===' not in line]
+        # pop summary line
+        lines.pop(-1)
+
+        # build component to status maps
+        profiles = {}
+        gateways = {}
+        aliases = {}
+
+        colnames = [name.lower() for name in lines.pop(0).split()]
+        iname = colnames.index('name')
+        colnames.remove('name')
+        for line in lines:
+            fields = [field.strip() for field in line.split('\t')]
+            name = fields.pop(iname)
+            row = {k.lower(): v for k, v in zip(colnames, fields)}
+            tp = row.pop('type')
+            if tp == 'profile':
+                profiles[name] = row
+            elif tp == 'gateway':
+                profname, gwname = name.split("::")
+                row['profile'] = profname
+                gateways[gwname] = row
+            elif tp == 'alias':
+                aliases[gwname] = row
+
+        return {'profiles': profiles, 'gateways': gateways, 'aliases': aliases}
+
 
 def manage_config(rootpath, sftp, fscli, log, singlefile=True):
     """Manage the FreeSWITCH configuration found at ``rootpath`` or as
@@ -117,7 +151,6 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
 
         # back up original freeswitch.xml root config
         backup = confpath + time.strftime('_backup_%Y-%m-%d-%H-%M-%S')
-        import pytest; pytest.set_trace()
         log.info("Backing up old {} as {}...".format(confpath, backup))
         sftp.rename(confpath, backup)
 
