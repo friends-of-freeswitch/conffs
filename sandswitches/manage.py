@@ -11,8 +11,8 @@ from io import BytesIO
 from lxml import etree
 from plumbum import ProcessExecutionError
 from .utils import RestoreFile
-from .orms import _models
-from .schema import buildfromschema
+from .orms import buildfromschema
+from .schema import _models
 
 
 log = logging.getLogger('sandswitches')
@@ -30,6 +30,9 @@ class cli(object):
     """``fs_cli`` wrapper which quacks like a func and can raise
     errors based on string handlers.
     """
+    CLIError = CLIError
+    CLIConnectionError = CLIConnectionError
+
     def __init__(self, ssh):
         self.ssh = ssh
         self.cli = self.ssh['fs_cli']['-x']
@@ -92,12 +95,14 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
     parser = etree.XMLParser(remove_blank_text=True)
     confpath = os.path.join(rootpath, 'freeswitch.xml')
 
+    log.info("Parsing {} into an etree...".format(confpath))
     with sftp.open(confpath) as fxml:
         tree = etree.parse(fxml, parser)
 
     # check if this is a single-file config by trying to access the
     # sofia configuration section
     if not tree.xpath('section/configuration[@name="sofia.conf"]'):
+        log.info("Dumping aggregate freeswitch.xml config...")
         # parse the single-document config
         root = etree.fromstring(fscli('xml_locate', 'root'), parser=parser)
         tree = etree.ElementTree(root)
@@ -111,8 +116,10 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
                     (s for s in elem.text.splitlines() if s.strip()))
 
         # back up original freeswitch.xml root config
-        sftp.rename(
-            confpath, confpath + time.strftime('_backup_%Y-%m-%d-%H-%M-%S'))
+        backup = confpath + time.strftime('_backup_%Y-%m-%d-%H-%M-%S')
+        import pytest; pytest.set_trace()
+        log.info("Backing up old {} as {}...".format(confpath, backup))
+        sftp.rename(confpath, backup)
 
         with sftp.open(confpath, 'w') as fxml:
             fxml.write(etree.tostring(tree, pretty_print=True))

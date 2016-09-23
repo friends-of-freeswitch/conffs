@@ -14,42 +14,22 @@ from lxml import etree
 log = logging.getLogger('sandswitches')
 
 
-_models = []
-
-
-def model(**kwargs):
-    """Decorator for registering config models with meta data to be matched
-    against when a config file is loaded.
-    """
-    def inner(cls):
-        _models.append((
-            lambda d: any(d[key] == value for key, value in kwargs.items()),
-            cls
-        ))
-        cls.modeldata = kwargs
-        return cls
-
-    return inner
-
-
-def get_model(**kwargs):
-    """Retrieve a model matching provided meta data.
-    """
-    for f, cls in _models:
-        if f(kwargs):
-            return cls
-
-    return TagMap
-
-
 class KeyValues(MutableMapping):
-
+    """An object to XML mapper base type which makes a key-value store
+    encoded in XML quack like an ordered mapping.
+    """
+    # A shitty mechanism to pass instance variable state into new instances
     kwargs = {}
 
     def __init__(self, name, path, tag, elem, confmng, **kwargs):
         self.name = name
         self.path = path  # relative xpath
         self.tag = tag
+        # This is the highest level node in the etree that we have a
+        # reference to. It is not necessarily the "parent" etree element of
+        # the underlying mapping. It is some node in the etree above the XML
+        # section of concern which when combined with self.path points to the
+        # "parent" etree element.
         self.elem = elem
         self.confmng = confmng
         self.attrs = set()
@@ -61,10 +41,14 @@ class KeyValues(MutableMapping):
             setattr(self, key, val)
 
     def fromelem(self, key, elem):
+        """Create and return an instance of this type to wrap the provided
+        etree element. Copy into it the instance variables defined in
+        self.kwargs.
+        """
         kwargs = {}
         for attr in self.kwargs:
             kwargs[attr] = getattr(self, attr)
-        kwargs['key'] = key
+        kwargs['key'] = key  # adds a self.key attr to the new inst
         inst = type(self)(
             self.name, self.path, self.tag, elem, self.confmng, **kwargs
         )
@@ -75,7 +59,10 @@ class KeyValues(MutableMapping):
     def __repr__(self):
         return '{}({})'.format(self.name, repr(dict(self)))
 
-    def _buildrent(self):
+    def _buildparent(self):
+        """Build all etree elements that don't exist up to ``self.path``
+        (which defines the parent node for this mapper type).
+        """
         node = self.elem
         for elem in self.path.split('/'):
             if node.find(elem) is None:
@@ -83,31 +70,41 @@ class KeyValues(MutableMapping):
 
     @property
     def parent(self):
-        """The XML parent element for this map pattern.
+        """The etree "parent" element for this mapping/section (i.e. the
+        element which either defines or whose sub-elements define the keys in
+        the mapping).
         """
         if self.path == '.':
             return self.elem
 
-        rent = self.elem.find(self.path)
-        if rent is None:
-            self._buildrent()
+        parent = self.elem.find(self.path)
+        if parent is None:
+            self._buildparent()
 
-        rent = self.elem.find(self.path)
-        assert rent is not None
-        return rent
+        parent = self.elem.find(self.path)
+        assert parent is not None
+        return parent
 
     @property
     def epath(self):
+        """The element path to ``self.elem``.
+        """
         return self.confmng.etree.getelementpath(self.elem)
 
     @property
     def xpath(self):
+        """The xpath to ``self.elem``.
+        """
         return self.confmng.etree.getpath(self.elem)
 
     def toxmlstring(self):
+        """Render this mapping to an XML string.
+        """
         return etree.tostring(self.parent, pretty_print=True)
 
     def printxml(self):
+        """Print the this mapping as rendered XML to stdout.
+        """
         print(self.toxmlstring())
 
     def __deepcopy__(self, memo):
@@ -119,7 +116,11 @@ class KeyValues(MutableMapping):
         val = self[src]
         newval = deepcopy(val)
         self[key] = newval
-        # TODO: why the hell do we do this instead of `return newval` again?
+        # The reason we return this instead of newval is that some
+        # __getitem__() calls create a new wrapper instance using fromelem()
+        # which applies state to the new obj (such as self.key). So returning
+        # this ensures that:
+        # obj.appendfrom('newkey', 'key') is obj['newkey'] == True
         return self[key]
 
     def appendfromxml(self, xmlstr, keyattr='name'):
@@ -191,6 +192,8 @@ class SpecialAttrsMap(KeyValues):
     'dog'
     """
     kwargs = {
+        # attributes whose values define the keys and values in the
+        # underlying mapping
         'keyattr': 'name',
         'valattr': 'value',
     }
@@ -233,7 +236,7 @@ class SpecialAttrsMap(KeyValues):
 
 
 class ElemMap(KeyValues):
-    """A represent a collection of key-tree pairs as a dict.
+    """Represent a collection of key-tree pairs as a dict.
     Turns this,
 
         <groups>
@@ -244,9 +247,11 @@ class ElemMap(KeyValues):
 
     into this,
         >>> groups['default']
-        <XML sub-tree wrapper obj>
+        <XML sub-tree mapper obj>
     """
     kwargs = {
+        # The KeyValues subtype used to wrap access to underlying XML subtrees
+        # which are the values of this mapping.
         'valtype': None,
         'keyattr': 'name',
     }
@@ -272,8 +277,11 @@ class ElemMap(KeyValues):
         return len(self.elem.xpath('{}/{}'.format(self.path, self.tag)))
 
     def __getitem__(self, key):
-        # this is subtle, the valtype will have it's elem reassigned
-        # depending on which subtree is accessed
+        # This is subtle, `valtype` will be assigned to an object mapper
+        # externally from the `buildfromschema` function and can be assigned to
+        # at most one type. In other words you should never see more then one
+        # child sub-mapper object defined under an ElemMap in a section's
+        # schema.
         return self.valtype.fromelem(key, self._getelem(key))
 
     def __setitem__(self, key, value):
@@ -309,10 +317,10 @@ class TagMap(KeyValues):
 
     and transforms it to this,
     >>> doggy['kitty']
-    <XML sub-tree wrapper obj>
+    <XML sub-tree mapper obj>
 
-    `subtypes` is used to look up the value wrapper to apply on the
-    retrieved xml sub-tree.
+    `subtypes` is used to look up the object-mapper to apply on the
+    retrieved XML sub-tree.
     '''
     kwargs = {
         'subtypes': {},
@@ -333,6 +341,7 @@ class TagMap(KeyValues):
 
     def __getitem__(self, key):
         subtype = self.subtypes[key]
+        # make sure an etree element exists
         self._getelem(subtype.path)
         return subtype.fromelem(key, self.elem)
 
@@ -342,11 +351,74 @@ class TagMap(KeyValues):
             val = self[key]
             val.clear()  # delete all conents
         except KeyError:
+            # lookup the correct sub-mapping type for this ``key``
             subtype = self.subtypes[key]
-            # pass our parent elem to a new subtype inst
             val = subtype.fromelem(key, self.parent)
 
         val.update(value)
 
     def __delitem__(self, key):
         self.elem.remove(self._getelem(key))
+
+
+def buildfromschema(obj, schemadict, **kwargs):
+    """Given an XML schema-to-object description, build a tree of object mappers
+    which can be used to create and modify underlying XML structures.
+    """
+    # Initial unbuilt section type (i.e. anything marked as a "schema.model").
+    if isinstance(obj, type):
+        obj = obj(
+            name=obj.modeldata['id'],
+            path=getattr(obj, 'path', '.'),
+            tag=getattr(obj, 'tag', '.'),
+            elem=kwargs['root'].xpath(obj.modeldata['xpath'])[0],
+            **kwargs
+        )
+        schemadict = obj.schema
+
+    if not schemadict:
+        return
+
+    # construct maps from schema
+    subschema = {}
+    subobjs = {}
+    for attrpath, contents in schemadict.items():
+        args = deepcopy(contents)
+        name, _, tail = attrpath.partition('.')
+
+        if tail:  # attrpath had at least one '.'
+            subschema.setdefault(name, {})[tail] = args
+        else:
+            # apply maptype as attr
+            cls = args.pop('maptype')
+
+            subobj = cls(
+                name=name,
+                path=args.pop('path', attrpath),
+                tag=args.pop('tag'),
+                elem=obj.elem,
+                confmng=obj.confmng,
+                **args
+            )
+            # support maptype subclasses which define further schema
+            if getattr(subobj, 'schema', None):
+                buildfromschema(subobj, subobj.schema)
+
+            subobjs[name] = subobj
+
+            # every subobj can be accessed explicitly by attr name
+            setattr(obj, name, subobj)
+            if isinstance(obj, TagMap):
+                obj.subtypes[name] = subobj
+
+    if isinstance(obj, ElemMap):
+        assert len(subobjs) == 1, "ElemMap must map to exactly one subsection"
+        obj.valtype = subobj
+
+    if subschema:  # recursively build from subschema
+        for name, subobj in subobjs.iteritems():
+            subcontents = subschema.get(name)
+            if subcontents:
+                buildfromschema(subobj, subcontents)
+
+    return obj

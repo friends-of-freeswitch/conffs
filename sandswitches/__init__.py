@@ -39,6 +39,7 @@ def manage(host, fscli=None, **ssh_opts):
     """Return a ``ConfigManager`` for the FreeSWITCH process
     discovered at ``host``.
     """
+    # yes this is how we do everything remotely
     ssh = get_ssh(host, **ssh_opts)
     sftp = get_sftp(host, **ssh_opts)
 

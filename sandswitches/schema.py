@@ -4,71 +4,38 @@ configuration "sections".
 """
 import time
 import logging
-from copy import deepcopy
-from .orms import TagMap, ElemMap, SpecialAttrsMap, AttrMap, model
+from .orms import TagMap, ElemMap, SpecialAttrsMap, AttrMap
 
 
 log = logging.getLogger('sandswitches')
 
 
-def buildfromschema(obj, schemadict, **kwargs):
-    # (initial) unbuilt section map type
-    if isinstance(obj, type):
-        obj = obj(
-            name=obj.modeldata['id'],
-            path=getattr(obj, 'path', '.'),
-            tag=getattr(obj, 'tag', '.'),
-            elem=kwargs['root'].xpath(obj.modeldata['xpath'])[0],
-            **kwargs
-        )
-        schemadict = obj.schema
+_models = []
 
-    if not schemadict:
-        return
 
-    # construct maps from schema
-    subschema = {}
-    subobjs = {}
-    for attrpath, contents in schemadict.items():
-        args = deepcopy(contents)
-        name, _, tail = attrpath.partition('.')
+def model(**kwargs):
+    """Decorator for registering config models with meta data to be matched
+    against when a config file is loaded.
+    """
+    def inner(cls):
+        _models.append((
+            lambda d: any(d[key] == value for key, value in kwargs.items()),
+            cls
+        ))
+        cls.modeldata = kwargs
+        return cls
 
-        if tail:  # attrpath had at least one '.'
-            subschema.setdefault(name, {})[tail] = args
-        else:
-            # apply maptype as attr
-            cls = args.pop('maptype')
+    return inner
 
-            subobj = cls(
-                name=name,
-                path=args.pop('path', attrpath),
-                tag=args.pop('tag'),
-                elem=obj.elem,
-                confmng=obj.confmng,
-                **args
-            )
-            # support maptype subclasses which define further schema
-            if getattr(subobj, 'schema', None):
-                buildfromschema(subobj, subobj.schema)
 
-            subobjs[name] = subobj
+def get_model(**kwargs):
+    """Retrieve a model matching provided meta data.
+    """
+    for f, cls in _models:
+        if f(kwargs):
+            return cls
 
-            # every subobj can be accessed explicitly by attr name
-            setattr(obj, name, subobj)
-            if isinstance(obj, TagMap):
-                obj.subtypes[name] = subobj
-
-    if isinstance(obj, ElemMap):
-        assert len(subobjs) == 1, "ElemMap must map to exactly one subsection"
-        obj.valtype = subobj
-
-    if subschema:  # recursively build from subschema
-        for name, subobj in subobjs.iteritems():
-            subcontents = subschema.get(name)
-            if subcontents:
-                buildfromschema(subobj, subcontents)
-
-    return obj
+    return TagMap
 
 
 class SofiaProfile(TagMap):
@@ -105,6 +72,9 @@ class SofiaProfile(TagMap):
     }
 
     def start(self, timeout=10):
+        """Start this sofia profile.
+        If not started within ``timeout`` seconds, raise an error.
+        """
         start = time.time()
         log.info("starting profile '{}'".format(self.key))
         self.confmng.fscli('sofia', 'profile', self.key, 'start',
@@ -131,6 +101,9 @@ class SofiaProfile(TagMap):
             time.sleep(0.5)
 
     def stop(self, timeout=10):
+        """Stop this sofia profile.
+        If not stopped within ``timeout`` seconds, raise an error.
+        """
         start = time.time()
         log.info("stopping profile '{}'".format(self.key))
         self.confmng.fscli('sofia', 'profile', self.key, 'stop',
