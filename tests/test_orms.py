@@ -2,13 +2,13 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
-Core Object-relational mappings testing.
+Sofia config object-relational mappings tests.
 """
 import pytest
 
 
 @pytest.fixture
-def sof_prof_template():
+def sof_prof_template(request):
     """Sofia profile template in Python dict form taken directly
     from the default config's ``external`` profile.
     """
@@ -30,12 +30,12 @@ def sof_prof_template():
             'tls-verify-depth': '2',
             'ext-rtp-ip': 'auto-nat',
             'outbound-codec-prefs': 'OPUS,G722,PCMU,PCMA,GSM',
-            'sip-ip': '10.10.8.21',
+            'sip-ip': '$${local_ip_v4}',
             'tls-only': 'false',
             'record-path': '/root/sng_fs_runtime/recordings',
             'nonce-ttl': '60',
             'tls-bind-params': 'transport=tls',
-            # 'force-register-db-domain': '10.10.8.21',
+            'force-register-db-domain': '$${local_ip_v4}',
             'rtp-timer-name': 'soft',
             'apply-inbound-acl': 'domains',
             'tls-verify-in-subjects': '',
@@ -43,13 +43,13 @@ def sof_prof_template():
             'dialplan': 'XML',
             'tls-passphrase': '',
             'local-network-acl': 'localnet.auto',
-            # 'presence-hosts': '10.10.8.21,10.10.8.21',
+            'presence-hosts':  '$${local_ip_v4}',
             'inbound-reg-force-matching-username': 'true',
             'watchdog-step-timeout': '30000',
             'sip-trace': 'no',
             'log-auth-failures': 'false',
             'record-template': rectemp,
-            # 'force-subscription-domain': '10.10.8.21',
+            'force-subscription-domain': '$${local_ip_v4}',
             'apply-nat-acl': 'nat.auto',
             'sip-capture': 'no',
             'tls-sip-port': '5061',
@@ -57,7 +57,7 @@ def sof_prof_template():
             'inbound-codec-negotiation': 'generous',
             'sip-port': '9999',  # probably will work on most setups
             'tls-ciphers': 'ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH',
-            # 'rtp-ip': '10.10.8.21',
+            'rtp-ip': '$${local_ip_v4}',
             'inbound-zrtp-passthru': 'true',
             'tls-verify-date': 'true',
             'tls': 'false',
@@ -71,7 +71,7 @@ def sof_prof_template():
             'dtmf-duration': '2000',
             'debug': '0',
             'tls-verify-policy': 'none',
-            # 'force-register-domain': '10.10.8.21'
+            'force-register-domain': '$${local_ip_v4}',
         },
         'gateways': {
         },
@@ -100,6 +100,14 @@ def test_create_sofia_profile(profile, confmng):
     assert profile.key in confmng.sofia_status()['profiles']
     profile.stop(timeout=11)
     assert profile.key not in confmng.sofia_status()['profiles']
+
+
+def test_sofia_profile_alias(profile, confmng):
+    profile['aliases'] = {'name': 'myprofile'}
+    confmng.commit()
+    profile.start()
+    assert 'myprofile' in confmng.sofia_status()['aliases']
+    profile.stop()
 
 
 def test_sofia_append_from(profile, confmng):
