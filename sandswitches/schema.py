@@ -45,9 +45,8 @@ class SofiaProfile(TagMap):
             'tag': 'param',
         },
         'aliases': {
-            'maptype': SpecialAttrsMap,
-            'path': '.',
-            'tag': 'param',
+            'maptype': AttrMap,
+            'tag': 'alias',
         },
         'gateways': {
             'maptype': ElemMap,
