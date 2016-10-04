@@ -116,7 +116,7 @@ class ConfigManager(object):
                 row['profile'] = profname
                 gateways[gwname] = row
             elif tp == 'alias':
-                aliases[gwname] = row
+                aliases[name] = row
 
         return {'profiles': profiles, 'gateways': gateways, 'aliases': aliases}
 
