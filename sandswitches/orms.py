@@ -151,7 +151,11 @@ class AttrMap(KeyValues):
     def _attribs(self):
         path = '/'.join((self.path, self.tag))
         nodes = self.elem.xpath(path)
-        assert len(nodes) == 1, "Not an AttrMap?"
+        if len(nodes) == 0:  # no sub-elements exists yet
+            raise KeyError
+
+        assert len(nodes) == 1, "Not an AttrMap? Nodes are {}".format(
+            nodes)
         return nodes[0].attrib
 
     def __iter__(self):
@@ -169,7 +173,10 @@ class AttrMap(KeyValues):
     def __setitem__(self, key, value):
         if key in self.skipkeys:
             raise KeyError(key)
-        self._attribs[key] = value
+        try:
+            self._attribs[key] = value
+        except KeyError:
+            etree.SubElement(self.parent, self.tag, **{key: value})
 
     def __delitem__(self, key):
         if key in self.skipkeys:
