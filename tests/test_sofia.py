@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
-Sofia config object-relational mappings tests.
+sofia.conf object-relational mappings tests.
 """
 import pytest
 
@@ -87,9 +87,12 @@ def profile(confmng, sof_prof_template):
     """
     confmng.sofia.profiles['doggy'] = sof_prof_template
     confmng.commit()
-    yield confmng.sofia.profiles['doggy']
+    prof = confmng.sofia.profiles['doggy']
+    yield prof
     del confmng.sofia.profiles['doggy']
     confmng.commit()
+    if 'doggy' in confmng.sofia_status()['profiles']:
+        prof.stop(timeout=11)
 
 
 def test_create_sofia_profile(profile, confmng):
@@ -107,7 +110,25 @@ def test_sofia_profile_alias(profile, confmng):
     confmng.commit()
     profile.start()
     assert 'myprofile' in confmng.sofia_status()['aliases']
-    profile.stop()
+
+
+def test_sofia_profile_gateway(profile, confmng):
+    user = 'doggy'
+    domain = 'fakedomain.com'
+    profile['gateways'] = {'mygateway': {
+        'username': user,
+        'password': 'doggypants',
+        'realm': domain,
+        'from-domain': domain,
+        'register': 'false',
+        'ping': '30',
+    }}
+    confmng.commit()
+    profile.start()
+    gateways = confmng.sofia_status()['gateways']
+    assert 'mygateway' in gateways
+    gw = gateways['mygateway']
+    assert '{}@{}'.format(user, domain) in gw['data']
 
 
 def test_sofia_append_from(profile, confmng):
