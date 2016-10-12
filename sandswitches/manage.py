@@ -34,15 +34,27 @@ class cli(object):
     CLIError = CLIError
     CLIConnectionError = CLIConnectionError
 
-    def __init__(self, ssh):
+    def __init__(self, ssh, *args, **kwargs):
         self.ssh = ssh
-        self.cli = self.ssh['fs_cli']['-x']
+        self._cli = self.get_cli(*args, **kwargs)
+
+    def get_cli(self, *args, **kwargs):
+        """Build and return an ``fs_cli`` command instance.
+        """
+        cli = self.ssh['fs_cli']
+        for arg in args:
+            cli = cli['--{}'.format(arg)]
+
+        for key, value in kwargs.items():
+            cli = cli['--{}={}'.format(key, value)]
+
+        return cli['-x']
 
     def __call__(self, *tokens, **erroron):
         '''Invoke an `fs_cli` command and return output with error handling.
         '''
         try:
-            out = self.cli(' '.join(map(str, tokens))).strip()
+            out = self._cli(' '.join(map(str, tokens))).strip()
         except ProcessExecutionError as err:
             raise CLIConnectionError(str(err))
 
@@ -86,6 +98,8 @@ class ConfigManager(object):
         self.file.restore()
 
     def commit(self):
+        """Commit the working XML etree to the remote FreeSWITCH config.
+        """
         now = time.time()
         self.log.info("saving '{}'".format(self.file.path))
         # write local copy
@@ -93,7 +107,6 @@ class ConfigManager(object):
             BytesIO(etree.tostring(self.etree, pretty_print=True)),
             self.file.path
         )
-        # self.file.write(etree.tostring(self.etree, pretty_print=True))
         self.fscli('reloadxml')
         log.debug("freeswitch.xml commit took {} seconds"
                   .format(time.time() - now))
