@@ -8,6 +8,7 @@ import time
 import logging
 import os
 from io import BytesIO
+from collections import namedtuple
 from lxml import etree
 from plumbum import ProcessExecutionError
 from .utils import RestoreFile
@@ -53,6 +54,11 @@ class cli(object):
                     raise CLIError(out)
         return out
 
+    def eval(self, expr):
+        """Eval an expression in ``fs_cli``.
+        """
+        return self('eval', expr)
+
 
 class ConfigManager(object):
     '''Manages a collection of restorable XML objects discovered in the
@@ -63,9 +69,15 @@ class ConfigManager(object):
         self.root = etree.getroot()
         self.file = rfile
         self.sftp = sftp
-        self.fscli = fscli
+        self.cli = fscli
         self.log = log
         self._touched = []
+
+    @property
+    def fscli(self):
+        """Alias for self.cli
+        """
+        return self.cli
 
     def revert(self):
         """Revert all changes to the root config file.
@@ -120,11 +132,39 @@ class ConfigManager(object):
 
         return {'profiles': profiles, 'gateways': gateways, 'aliases': aliases}
 
+    def get_users(self, **kwargs):
+        """Return all directory users in a map keyed by domain name.
+        """
+        args = []
+        allowed = ('domain', 'group', 'user', 'context')
+        for argname, value in kwargs.items():
+            if argname not in allowed:
+                raise ValueError(
+                    '{} is not a valid argument to list_users'.format(
+                        argname)
+                )
+            args.append('{} {}'.format(argname, value))
+
+        # last two lines are entirely useless
+        res = self.cli('list_users', *args).splitlines()[:-2]
+        UserEntry = namedtuple("UserEntry", res[0].split('|'))
+        # collect and pack all users
+        users = []
+        for row in res[1:]:
+            users.append(UserEntry(*row.split('|')))
+
+        # pack users by domain
+        domains = {}
+        for user in users:
+            domains.setdefault(user.domain, []).append(user)
+
+        return domains
+
 
 def manage_config(rootpath, sftp, fscli, log, singlefile=True):
     """Manage the FreeSWITCH configuration found at ``rootpath`` or as
     auto-discovered using ``fs_cli`` over ssh. By default all XML configs are
-    squashed down too a single ``freeswitch.xml`` file.
+    squashed down to a single ``freeswitch.xml`` file.
     """
     parser = etree.XMLParser(remove_blank_text=True)
     confpath = os.path.join(rootpath, 'freeswitch.xml')
