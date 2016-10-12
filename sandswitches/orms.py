@@ -110,7 +110,7 @@ class KeyValues(MutableMapping):
     def __deepcopy__(self, memo):
         return self.fromelem(self.key, deepcopy(self.elem))
 
-    def appendfrom(self, key, src):
+    def appendfrom(self, src, key):
         """Append a copy of the value at ``src`` to the value at ``key``.
         """
         val = self[src]

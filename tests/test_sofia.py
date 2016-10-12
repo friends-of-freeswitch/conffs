@@ -132,7 +132,7 @@ def test_sofia_profile_gateway(profile, confmng):
 
 
 def test_sofia_append_from(profile, confmng):
-    newprof = confmng.sofia.profiles.appendfrom('doggy2', profile.key)
+    newprof = confmng.sofia.profiles.appendfrom(profile.key, 'doggy2')
     try:
         assert newprof.key not in confmng.sofia_status()['profiles']
         newprof['settings']['sip-port'] = '1001'
