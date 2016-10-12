@@ -7,6 +7,7 @@ Config management API and helpers.
 import time
 import logging
 import os
+import tempfile
 from io import BytesIO
 from collections import namedtuple
 from lxml import etree
@@ -182,9 +183,18 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
     parser = etree.XMLParser(remove_blank_text=True)
     confpath = os.path.join(rootpath, 'freeswitch.xml')
 
-    log.info("Parsing {} into an etree...".format(confpath))
-    with sftp.open(confpath) as fxml:
+    # copy to a local path and parse for speed
+    start = time.time()
+    _, localpath = tempfile.mkstemp(
+        prefix='{}-freeswitch-'.format(fscli.ssh._fqhost),
+        suffix='.xml',
+    )
+    with open(localpath, 'w') as fxml:
+        sftp.getfo(confpath, fxml)
+    with open(localpath, 'r') as fxml:
         tree = etree.parse(fxml, parser)
+    log.info("Parsing {} into an etree took {} seconds".format(
+        confpath, time.time() - start))
 
     # check if this is a single-file config by trying to access the
     # sofia configuration section
