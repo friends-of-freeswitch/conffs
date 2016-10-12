@@ -70,7 +70,7 @@ class SofiaProfile(TagMap):
         },
     }
 
-    def start(self, timeout=10):
+    def start(self, timeout=11):
         """Start this sofia profile.
         If not started within ``timeout`` seconds, raise an error.
         """
@@ -99,7 +99,7 @@ class SofiaProfile(TagMap):
         ):
             time.sleep(0.5)
 
-    def stop(self, timeout=10):
+    def stop(self, timeout=11):
         """Stop this sofia profile.
         If not stopped within ``timeout`` seconds, raise an error.
         """
