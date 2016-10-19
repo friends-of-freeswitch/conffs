@@ -1,10 +1,12 @@
 """
-XML schema which describe object-relational mappings for FreeSWITCH
-configuration "sections".
+Schema to describe which object-relational mappings should be used
+for each FreeSWITCH XML configuration "section".
 """
 import time
 import logging
-from .orms import TagMap, ElemMap, SpecialAttrsMap, AttrMap
+from .orms import (
+    TagMap, ElemMap, SpecialAttrsMap, AttrMap, ElemList
+)
 
 
 log = logging.getLogger('sandswitches')
@@ -45,7 +47,7 @@ class SofiaProfile(TagMap):
             'tag': 'param',
         },
         'aliases': {
-            'maptype': AttrMap,
+            'maptype': ElemList,
             'tag': 'alias',
         },
         'gateways': {
@@ -99,7 +101,7 @@ class SofiaProfile(TagMap):
         ):
             time.sleep(0.5)
 
-    def stop(self, timeout=11):
+    def stop(self, timeout=12):
         """Stop this sofia profile.
         If not stopped within ``timeout`` seconds, raise an error.
         """
@@ -107,12 +109,13 @@ class SofiaProfile(TagMap):
         log.info("stopping profile '{}'".format(self.key))
         self.confmng.fscli('sofia', 'profile', self.key, 'stop',
                            checkfail=lambda out: 'Failure'in out)
-        # poll for profile to come up
+
+        # poll for profile to shut down
         while 'Invalid Profile' not in self.confmng.fscli(
             'sofia', 'profile', self.key, 'stop',
             checkfail=lambda out: 'Failure' in out
         ):
-            time.sleep(0.5)
+            time.sleep(1)
             if time.time() - start > timeout:
                 raise RuntimeError(
                     "Failed to stop '{}' after {} seconds".format(
