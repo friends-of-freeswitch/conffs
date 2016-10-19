@@ -97,4 +97,117 @@ def fshost(fshosts):
 
 @pytest.fixture
 def confmng(request, fshost):
+    """ConfigManager instance loaded for the FreeSWITCH process running at
+    ``--fshost``.
+    """
     return sandswitches.manage(fshost, keyfile=request.config.option.keyfile)
+
+
+@pytest.fixture
+def sof_prof_template(request):
+    """Sofia profile template in Python dict form taken directly
+    from the default config's ``external`` profile.
+    """
+    rectemp = ('${caller_id_number}.${target_domain}'
+               '.${strftime(%Y-%m-%d-%H-%M-%S)}.wav')
+    return {
+        'domains': {
+            'all': {'parse': 'false', 'alias': 'true'}
+        },
+        'settings': {
+            'forward-unsolicited-mwi-notify': 'false',
+            'rtp-timeout-sec': '300',
+            'inbound-codec-prefs': 'OPUS,G722,PCMU,PCMA,GSM',
+            'hold-music': 'local_stream://moh',
+            'watchdog-enabled': 'no',
+            'manage-presence': 'true',
+            'auth-all-packets': 'false',
+            'rfc2833-pt': '101',
+            'tls-verify-depth': '2',
+            'ext-rtp-ip': 'auto-nat',
+            'outbound-codec-prefs': 'OPUS,G722,PCMU,PCMA,GSM',
+            'sip-ip': '$${local_ip_v4}',
+            'tls-only': 'false',
+            'record-path': '/root/sng_fs_runtime/recordings',
+            'nonce-ttl': '60',
+            'tls-bind-params': 'transport=tls',
+            'force-register-db-domain': '$${local_ip_v4}',
+            'rtp-timer-name': 'soft',
+            'apply-inbound-acl': 'domains',
+            'tls-verify-in-subjects': '',
+            'auth-calls': 'true',
+            'dialplan': 'XML',
+            'tls-passphrase': '',
+            'local-network-acl': 'localnet.auto',
+            'presence-hosts':  '$${local_ip_v4}',
+            'inbound-reg-force-matching-username': 'true',
+            'watchdog-step-timeout': '30000',
+            'sip-trace': 'no',
+            'log-auth-failures': 'false',
+            'record-template': rectemp,
+            'force-subscription-domain': '$${local_ip_v4}',
+            'apply-nat-acl': 'nat.auto',
+            'sip-capture': 'no',
+            'tls-sip-port': '5061',
+            'inbound-late-negotiation': 'true',
+            'inbound-codec-negotiation': 'generous',
+            'sip-port': '9999',  # probably will work on most setups
+            'tls-ciphers': 'ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH',
+            'rtp-ip': '$${local_ip_v4}',
+            'inbound-zrtp-passthru': 'true',
+            'tls-verify-date': 'true',
+            'tls': 'false',
+            'watchdog-event-timeout': '30000',
+            'tls-version': 'tlsv1,tlsv1.1,tlsv1.2',
+            'ext-sip-ip': 'auto-nat',
+            'challenge-realm': 'auto_from',
+            'rtp-hold-timeout-sec': '1800',
+            'presence-privacy': 'false',
+            'context': 'public',
+            'dtmf-duration': '2000',
+            'debug': '0',
+            'tls-verify-policy': 'none',
+            'force-register-domain': '$${local_ip_v4}',
+        },
+        'gateways': {
+        },
+        'aliases': []
+    }
+
+
+@pytest.fixture
+def domain_template(request, confmng):
+    """Template for a directory domain in Python dict form based on
+    the default config.
+    """
+    dialvars = '{^^:sip_invite_domain=${dialed_domain}:presence_id=${dialed_user}@${dialed_domain}}'
+    dialstring = '${sofia_contact(*/${dialed_user}@${dialed_domain})}'
+    pw = 'doggypants'
+
+    return {
+        'params': {'dial-string': dialstring},
+        'variables': {
+            "record_stereo": "true",
+            "default_gateway": "$${default_provider}",
+            "default_areacode": "$${default_areacode}",
+            "transfer_fallback_extension": "operator",
+        },
+        'groups': {'default': {'users': {
+            'doggy': {
+                'params': {
+                    'password': pw,
+                    'vm-password': pw,
+                },
+                'variables': {
+                    "toll_allow": "domestic,international,local",
+                    "accountcode": "1000",
+                    "user_context": "default",
+                    "effective_caller_id_name": "Extension 1000",
+                    "effective_caller_id_number": "1000",
+                    "outbound_caller_id_name": "$${outbound_caller_name}",
+                    "outbound_caller_id_number": "$${outbound_caller_id}",
+                    "callgroup": "techsupport",
+                }
+            }
+        }}},
+    }
