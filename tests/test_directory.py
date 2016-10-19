@@ -17,6 +17,12 @@ def domain(confmng, domain_template):
     confmng.commit()
 
 
+def test_read_directory_section(confmng):
+    """Check that the entire section can be read via object maps without error.
+    """
+    assert repr(confmng.directory)
+
+
 def test_push_user(domain, confmng):
     userdata = confmng.get_users()
     users = userdata['test']
