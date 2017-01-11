@@ -88,19 +88,20 @@ def fshosts(request):
     return fshosts
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def fshost(fshosts):
     """First hostname specified in the ``--fshost`` cli arg.
     """
     return fshosts[0]
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def confmng(request, fshost):
     """ConfigManager instance loaded for the FreeSWITCH process running at
     ``--fshost``.
     """
-    return sandswitches.manage(fshost, keyfile=request.config.option.keyfile)
+    keyfile = request.config.option.keyfile
+    return sandswitches.manage(fshost, keyfile=keyfile)
 
 
 @pytest.fixture
