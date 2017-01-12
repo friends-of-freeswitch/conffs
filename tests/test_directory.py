@@ -7,16 +7,6 @@ Directory configuration section object-relational mappings tests.
 import pytest
 
 
-@pytest.fixture
-def domain(confmng, domain_template):
-    name = 'test'  # '{}'.format(confmng.cli.eval('$${local_ip_v4}'))
-    confmng.directory[name] = domain_template
-    confmng.commit()
-    yield confmng.directory[name]
-    del confmng.directory[name]
-    confmng.commit()
-
-
 def test_read_directory_section(confmng):
     """Check that the entire section can be read via object maps without error.
     """
@@ -25,7 +15,7 @@ def test_read_directory_section(confmng):
 
 def test_push_user(domain, confmng):
     userdata = confmng.get_users()
-    users = userdata['test']
+    users = userdata[domain.key]
     assert len(users) == 1
     assert users[0].userid == 'doggy'
 

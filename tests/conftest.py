@@ -2,6 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import sys
+import socket
 import pytest
 import logging
 import logging.config
@@ -177,11 +178,38 @@ def sof_prof_template(request):
 
 
 @pytest.fixture
+def mkprofile(confmng, sof_prof_template):
+    """A profile factory with settings taken directly from the default
+    config's ``external`` profile template.
+    """
+    profiles = []
+
+    def profile(name):
+        # confmng.sofia.profiles['doggy'] = sof_prof_template
+        confmng.sofia.profiles[name] = sof_prof_template
+        confmng.commit()
+        prof = confmng.sofia.profiles[name]
+        profiles.append(prof)
+        return prof
+
+    yield profile
+
+    for profile in profiles:
+        key = profile.key
+        del confmng.sofia.profiles[key]
+        if key in confmng.sofia_status()['profiles']:
+            profile.stop()
+
+    confmng.commit()
+
+
+@pytest.fixture
 def domain_template(request, confmng):
     """Template for a directory domain in Python dict form based on
     the default config.
     """
-    dialvars = '{^^:sip_invite_domain=${dialed_domain}:presence_id=${dialed_user}@${dialed_domain}}'
+    # dialvars = '{^^:sip_invite_domain=${dialed_domain}:
+    # presence_id=${dialed_user}@${dialed_domain}}'
     dialstring = '${sofia_contact(*/${dialed_user}@${dialed_domain})}'
     pw = 'doggypants'
 
@@ -212,3 +240,15 @@ def domain_template(request, confmng):
             }
         }}},
     }
+
+
+@pytest.fixture
+def domain(fshost, confmng, domain_template):
+    """A test domain using a template.
+    """
+    name = socket.gethostbyname(fshost)
+    confmng.directory[name] = domain_template
+    confmng.commit()
+    yield confmng.directory[name]
+    del confmng.directory[name]
+    confmng.commit()

@@ -9,18 +9,8 @@ import time
 
 
 @pytest.fixture
-def profile(confmng, sof_prof_template):
-    """Deliver a profile with settings taken directly from the default
-    config's ``external`` profile template.
-    """
-    confmng.sofia.profiles['doggy'] = sof_prof_template
-    confmng.commit()
-    prof = confmng.sofia.profiles['doggy']
-    yield prof
-    del confmng.sofia.profiles['doggy']
-    confmng.commit()
-    if 'doggy' in confmng.sofia_status()['profiles']:
-        prof.stop()
+def profile(mkprofile):
+    return mkprofile('doggy')
 
 
 def test_read_sofia_section(confmng):
@@ -47,7 +37,7 @@ def test_sofia_profile_aliases(profile, confmng):
     assert name in confmng.sofia_status()['aliases']
     time.sleep(0.5)
     profile.stop()
-    profile['aliases'].insert(0,'yourprofile')
+    profile['aliases'].insert(0, 'yourprofile')
     profile['aliases'].insert(1, '2yourprofile')
     assert ('yourprofile', '2yourprofile', name) == tuple(
             profile['aliases'])
