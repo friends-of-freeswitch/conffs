@@ -214,11 +214,7 @@ class AttrMap(KeyValues):
     @property
     def _attribs(self):
         nodes = self._subelems
-        if len(nodes) == 0:  # no sub-elements exists yet
-            raise KeyError
-
-        assert len(nodes) == 1, "Not an AttrMap? Nodes are {}".format(
-            nodes)
+        assert len(nodes) == 1, "Not an AttrMap? Nodes are {}".format(nodes)
         return nodes[0].attrib
 
     def __iter__(self):
