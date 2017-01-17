@@ -6,7 +6,7 @@ Object-relational mappings for common XML schema patterns found in a variety
 of sections.
 """
 import logging
-from collections import MutableMapping
+from collections import MutableMapping, MutableSequence
 from copy import deepcopy
 from lxml import etree
 
@@ -14,9 +14,8 @@ from lxml import etree
 log = logging.getLogger('sandswitches')
 
 
-class KeyValues(MutableMapping):
-    """An object to XML mapper base type which makes a key-value store
-    encoded in XML quack like an ordered mapping.
+class EtreeMapper(object):
+    """Access the etree using the xpath API.
     """
     # A shitty mechanism to pass instance variable state into new instances
     kwargs = {}
@@ -55,9 +54,6 @@ class KeyValues(MutableMapping):
         for name in self.attrs:
             setattr(inst, name, getattr(self, name))
         return inst
-
-    def __repr__(self):
-        return '{}({})'.format(self.name, repr(dict(self)))
 
     def _buildparent(self):
         """Build all etree elements that don't exist up to ``self.path``
@@ -110,7 +106,7 @@ class KeyValues(MutableMapping):
     def __deepcopy__(self, memo):
         return self.fromelem(self.key, deepcopy(self.elem))
 
-    def appendfrom(self, key, src):
+    def appendfrom(self, src, key):
         """Append a copy of the value at ``src`` to the value at ``key``.
         """
         val = self[src]
@@ -133,6 +129,70 @@ class KeyValues(MutableMapping):
         return self[tree.attrib[keyattr]]
 
 
+class KeyValues(MutableMapping, EtreeMapper):
+    """An object to XML mapper base type which makes a key-value store
+    encoded in XML quack like an ordered mapping.
+    """
+    def __repr__(self):
+        return '{}({})'.format(self.name, repr(dict(self)))
+
+
+class Sequence(MutableSequence, EtreeMapper):
+    """An object to XML mapper base type which makes a list of elements
+    encoded in XML quack like an sequence.
+    """
+    def __repr__(self):
+        return '{}({})'.format(self.name, repr(list(self)))
+
+
+class ElemList(Sequence):
+    """Access ordered lists of elements which define a single value in
+    in an attribute named ``attrname``. In other words it transforms XML
+    like:
+
+    <aliases>
+        <alias name="outbound"/>
+        <alias name="nat"/>
+    </aliases>
+
+    into a sequence like:
+
+    >>> sofia.profiles['external'].aliases
+    ["outbound", "nat"]
+
+    >>> sofia.profiles['external'].aliases.append('doggy')
+    ["outbound", "nat", "doggy"]
+    """
+    kwargs = {
+        'attrname': 'name'
+    }
+
+    @property
+    def _subelems(self):
+        return self.elem.xpath('/'.join((self.path, self.tag)))
+
+    def __getitem__(self, index):
+        return self._subelems[index].attrib[self.attrname]
+
+    def __setitem__(self, index, value):
+        self._subelems[index].attrib[self.attrname] = value
+
+    def __delitem__(self, index):
+        del self._subelems[index]
+
+    def __len__(self):
+        return len(self._subelems)
+
+    def insert(self, index, value):
+        self.parent.insert(
+            index,
+            etree.Element(self.tag, **{self.attrname: value})
+        )
+
+    # for compat with mapping types which use this as a sub-type mapper
+    update = Sequence.extend
+
+
 class AttrMap(KeyValues):
     """Access maps of element attributes as if a dict:
 
@@ -148,17 +208,24 @@ class AttrMap(KeyValues):
     }
 
     @property
+    def _subelems(self):
+        return self.elem.xpath('/'.join((self.path, self.tag)))
+
+    @property
     def _attribs(self):
-        path = '/'.join((self.path, self.tag))
-        nodes = self.elem.xpath(path)
-        assert len(nodes) == 1, "Not an AttrMap?"
+        nodes = self._subelems
+        assert len(nodes) == 1, "Not an AttrMap? Nodes are {}".format(nodes)
         return nodes[0].attrib
 
     def __iter__(self):
-        return (key for key in self._attribs.iterkeys()
+        if not self._subelems:
+            return iter([])
+        return (key for key in self._attribs.keys()
                 if key not in self.skipkeys)
 
     def __len__(self):
+        if not self._subelems:
+            return 0
         return len(set(self._attribs.keys()) - set(self.skipkeys))
 
     def __getitem__(self, key):
@@ -169,7 +236,10 @@ class AttrMap(KeyValues):
     def __setitem__(self, key, value):
         if key in self.skipkeys:
             raise KeyError(key)
-        self._attribs[key] = value
+        try:
+            self._attribs[key] = value
+        except IndexError:
+            etree.SubElement(self.parent, self.tag, **{key: value})
 
     def __delitem__(self, key):
         if key in self.skipkeys:
@@ -285,7 +355,6 @@ class ElemMap(KeyValues):
         return self.valtype.fromelem(key, self._getelem(key))
 
     def __setitem__(self, key, value):
-        value = dict(value)
         try:
             val = self[key]
             val.clear()  # delete all conents
@@ -330,7 +399,7 @@ class TagMap(KeyValues):
         return len(self.subtypes)
 
     def __iter__(self):
-        return (key for key in self.subtypes.iterkeys()
+        return (key for key in self.subtypes.keys()
                 if self.elem.find(key) is not None)
 
     def _getelem(self, key):
@@ -346,13 +415,14 @@ class TagMap(KeyValues):
         return subtype.fromelem(key, self.elem)
 
     def __setitem__(self, key, value):
-        value = dict(value)
         try:
             val = self[key]
             val.clear()  # delete all conents
         except KeyError:
             # lookup the correct sub-mapping type for this ``key``
             subtype = self.subtypes[key]
+            # insert new element (ex. <tag/>)
+            etree.SubElement(self.parent, subtype.path)
             val = subtype.fromelem(key, self.parent)
 
         val.update(value)

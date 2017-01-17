@@ -8,6 +8,7 @@ import logging
 import os
 import plumbum
 import paramiko
+from getpass import getpass
 
 
 log = logging.getLogger('sandswitches')
@@ -18,7 +19,22 @@ SSH_OPTS = ['-o', 'UserKnownHostsFile=/dev/null',
             '-o', 'ServerAliveInterval=5']
 
 
-def get_sftp(hostname, port=22, user='root', keyfile=None, password=None):
+def get_pkey(keyfile, prompt=True, password=None):
+    """Get a private key references prompting for password by default.
+    """
+    try:
+        return paramiko.RSAKey.from_private_key_file(
+            keyfile, password=password)
+    except paramiko.ssh_exception.PasswordRequiredException:
+        if not prompt:
+            raise
+
+        return paramiko.RSAKey.from_private_key_file(
+            keyfile, password=getpass("Password for {}: ".format(keyfile)))
+
+
+def get_sftp(hostname, port=22, user='root', keyfile=None, password=None,
+             keypw=None):
     """Get an SFTP connection using paramiko and plumbum.
     """
     def get_transport(**kwargs):
@@ -30,8 +46,8 @@ def get_sftp(hostname, port=22, user='root', keyfile=None, password=None):
         return paramiko.SFTPClient.from_transport(transport)
 
     if keyfile:
+        pkey = get_pkey(keyfile, password=keypw)
         try:
-            pkey = paramiko.RSAKey.from_private_key_file(keyfile)
             transport = get_transport(username=user, pkey=pkey)
             return get_sftp(transport)
         except paramiko.ssh_exception.AuthenticationException:
@@ -43,7 +59,8 @@ def get_sftp(hostname, port=22, user='root', keyfile=None, password=None):
     return get_sftp(transport)
 
 
-def get_ssh(hostname, port=22, user='root', keyfile=None, password=None):
+def get_ssh(hostname, port=22, user='root', keyfile=None, password=None,
+            keypw=None):
     """Get a ``plumbum.SshMachine`` instance.
     """
     settings = {'port': port, 'ssh_opts': SSH_OPTS, 'scp_opts': SSH_OPTS}
