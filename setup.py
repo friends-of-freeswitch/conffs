@@ -15,8 +15,7 @@ with open('README.rst') as f:
 setup(
     name="sandswitches",
     version='0.1.0.alpha',
-    description='A Python ORM API that makes configuring FreeSWITCH a lunch'
-                ' break.',
+    description='A Python API that makes configuring FreeSWITCH a lunch break',
     long_description=readme,
     license='Mozilla',
     author='Sangoma Technologies',
