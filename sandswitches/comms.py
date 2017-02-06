@@ -34,7 +34,7 @@ def get_pkey(keyfile, prompt=True, password=None):
 
 
 def get_sftp(hostname, port=22, user='root', keyfile=None, password=None,
-             keypw=None):
+             keypw=None, pkey=None):
     """Get an SFTP connection using paramiko and plumbum.
     """
     def get_transport(**kwargs):
@@ -46,7 +46,7 @@ def get_sftp(hostname, port=22, user='root', keyfile=None, password=None,
         return paramiko.SFTPClient.from_transport(transport)
 
     if keyfile:
-        pkey = get_pkey(keyfile, password=keypw)
+        pkey = pkey or get_pkey(keyfile, password=keypw)
         try:
             transport = get_transport(username=user, pkey=pkey)
             return get_sftp(transport)
@@ -60,7 +60,7 @@ def get_sftp(hostname, port=22, user='root', keyfile=None, password=None,
 
 
 def get_ssh(hostname, port=22, user='root', keyfile=None, password=None,
-            keypw=None):
+            keypw=None, pkey=None):
     """Get a ``plumbum.SshMachine`` instance.
     """
     settings = {'port': port, 'ssh_opts': SSH_OPTS, 'scp_opts': SSH_OPTS}

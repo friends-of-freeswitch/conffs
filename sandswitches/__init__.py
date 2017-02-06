@@ -6,13 +6,14 @@ sandswitches: A Python ORM API for configuring and managing FreeSWITCH
               configuration using Python data structures.
 """
 import logging
-from .comms import get_ssh, get_sftp
+from .comms import get_ssh, get_sftp, get_pkey
 from .manage import manage_config, cli, CLIConnectionError, CLIError
 
 
 __package__ = 'sandswitches'
 __version__ = '0.1.alpha'
 __author__ = ('Sangoma Technologies', 'tgoodlet@sangoma.com')
+__all__ = ['find_root', 'manage', 'manage_config']
 
 
 log = logging.getLogger('sandswitches')
@@ -35,10 +36,11 @@ def find_root(ssh, fscli, runpath):
         return root
 
 
-def manage(host, fscli=None, **ssh_opts):
+def manage(host, fscli=None, cache_key_pw=True, **ssh_opts):
     """Return a ``ConfigManager`` for the FreeSWITCH process
     discovered at ``host``.
     """
+    ssh_opts['pkey'] = get_pkey(ssh_opts['keyfile']) if cache_key_pw else None
     # yes this is how we do everything remotely
     ssh = get_ssh(host, **ssh_opts)
     sftp = get_sftp(host, **ssh_opts)

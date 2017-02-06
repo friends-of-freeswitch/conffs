@@ -102,7 +102,7 @@ def confmng(request, fshost):
     ``--fshost``.
     """
     keyfile = request.config.option.keyfile
-    return sandswitches.manage(fshost, keyfile=keyfile)
+    return sandswitches.manage(fshost, keyfile=keyfile, cache_key_pw=True)
 
 
 @pytest.fixture
