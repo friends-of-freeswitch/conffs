@@ -59,8 +59,10 @@ class cli(object):
         except ProcessExecutionError as err:
             raise CLIConnectionError(str(err))
 
-        if '-ERR' in out:
+        lines = out.splitlines()
+        if lines and lines[-1].startswith('-ERR'):
             raise CLIError(out)
+
         if erroron:
             for name, func in erroron.items():
                 if func(out):
