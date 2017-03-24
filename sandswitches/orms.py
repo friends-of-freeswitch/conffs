@@ -120,7 +120,7 @@ class EtreeMapper(object):
         return self[key]
 
     def appendfromxml(self, xmlstr, keyattr='name'):
-        tree = etree.XML(xmlstr)
+        tree = etree.XML(xmlstr.encode())
         if tree.tag == 'include':
             children = tree.getchildren()
             assert len(children) == 1
@@ -486,7 +486,7 @@ def buildfromschema(obj, schemadict, **kwargs):
         obj.valtype = subobj
 
     if subschema:  # recursively build from subschema
-        for name, subobj in subobjs.iteritems():
+        for name, subobj in subobjs.items():
             subcontents = subschema.get(name)
             if subcontents:
                 buildfromschema(subobj, subcontents)

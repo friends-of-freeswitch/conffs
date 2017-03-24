@@ -191,7 +191,7 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
         prefix='{}-freeswitch-'.format(fscli.ssh._fqhost),
         suffix='.xml',
     )
-    with open(localpath, 'w') as fxml:
+    with open(localpath, 'wb') as fxml:  # open as bytes
         sftp.getfo(confpath, fxml)
     with open(localpath, 'r') as fxml:
         tree = etree.parse(fxml, parser)
