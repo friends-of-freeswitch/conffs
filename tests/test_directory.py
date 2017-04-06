@@ -10,11 +10,11 @@ import pytest
 def test_read_directory_section(confmng):
     """Check that the entire section can be read via object maps without error.
     """
-    assert repr(confmng.directory)
+    assert repr(confmng.directory.config)
 
 
 def test_push_user(domain, confmng):
-    userdata = confmng.get_users()
+    userdata = confmng.directory.get_users()
     users = userdata[domain.key]
     assert len(users) == 1
     assert users[0].userid == 'doggy'
@@ -24,7 +24,7 @@ def test_user_count(confmng, domain):
     """Push 300 users, 100 each in a separate group and
     verify they can all be read back using the list_users cmd.
     """
-    orig_users = confmng.get_users()
+    orig_users = confmng.directory.get_users()
 
     for igroup in range(3):
         group = domain['groups'].appendfrom(
@@ -34,5 +34,5 @@ def test_user_count(confmng, domain):
         del group['users']['doggy']
 
     confmng.commit()
-    new_users = confmng.get_users()
+    new_users = confmng.directory.get_users()
     assert len(new_users[domain.key]) - len(orig_users[domain.key]) == 300
