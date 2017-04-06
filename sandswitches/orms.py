@@ -328,14 +328,13 @@ class ElemMap(KeyValues):
 
     def _getelem(self, key):
         try:
-            if isinstance(key, str):
+            if isinstance(key, int):
+                return self.elem.xpath('{}/{}[@{}]'.format(
+                    self.path, self.tag, self.keyattr))[key]
+            else:  # str index
                 return self.elem.xpath(
                     '{}/{}[@{}="{}"]'.format(
                         self.path, self.tag, self.keyattr, key))[0]
-            # int index
-            return self.elem.xpath('{}/{}[@{}]'.format(
-                self.path, self.tag, self.keyattr))[key]
-
         except IndexError:
             raise KeyError(key)
 
