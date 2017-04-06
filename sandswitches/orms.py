@@ -20,7 +20,7 @@ class EtreeMapper(object):
     # A shitty mechanism to pass instance variable state into new instances
     kwargs = {}
 
-    def __init__(self, name, path, tag, elem, confmng, **kwargs):
+    def __init__(self, name, path, tag, elem, client, **kwargs):
         self.name = name
         self.path = path  # relative xpath
         self.tag = tag
@@ -30,7 +30,7 @@ class EtreeMapper(object):
         # section of concern which when combined with self.path points to the
         # "parent" etree element.
         self.elem = elem
-        self.confmng = confmng
+        self.client = client
         self.attrs = set()
         kwds = deepcopy(type(self).kwargs)
         kwds.update(kwargs)
@@ -49,7 +49,7 @@ class EtreeMapper(object):
             kwargs[attr] = getattr(self, attr)
         kwargs['key'] = key  # adds a self.key attr to the new inst
         inst = type(self)(
-            self.name, self.path, self.tag, elem, self.confmng, **kwargs
+            self.name, self.path, self.tag, elem, self.client, **kwargs
         )
         for name in self.attrs:
             setattr(inst, name, getattr(self, name))
@@ -85,13 +85,13 @@ class EtreeMapper(object):
     def epath(self):
         """The element path to ``self.elem``.
         """
-        return self.confmng.etree.getelementpath(self.elem)
+        return self.client.etree.getelementpath(self.elem)
 
     @property
     def xpath(self):
         """The xpath to ``self.elem``.
         """
-        return self.confmng.etree.getpath(self.elem)
+        return self.client.etree.getpath(self.elem)
 
     def toxmlstring(self):
         """Render this mapping to an XML string.
@@ -438,7 +438,7 @@ def buildfromschema(obj, schemadict, **kwargs):
     # Initial unbuilt section type (i.e. anything marked as a "schema.model").
     if isinstance(obj, type):
         obj = obj(
-            name=obj.modeldata['id'],
+            name=obj.modeldata['modname'],
             path=getattr(obj, 'path', '.'),
             tag=getattr(obj, 'tag', '.'),
             elem=kwargs['root'].xpath(obj.modeldata['xpath'])[0],
@@ -467,7 +467,7 @@ def buildfromschema(obj, schemadict, **kwargs):
                 path=args.pop('path', attrpath),
                 tag=args.pop('tag'),
                 elem=obj.elem,
-                confmng=obj.confmng,
+                client=obj.client,
                 **args
             )
             # support maptype subclasses which define further schema
