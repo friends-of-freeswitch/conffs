@@ -185,10 +185,9 @@ def mkprofile(confmng, sof_prof_template):
     profiles = []
 
     def profile(name):
-        # confmng.sofia.profiles['doggy'] = sof_prof_template
-        confmng.sofia.profiles[name] = sof_prof_template
+        confmng.sofia.config.profiles[name] = sof_prof_template
         confmng.commit()
-        prof = confmng.sofia.profiles[name]
+        prof = confmng.sofia.config.profiles[name]
         profiles.append(prof)
         return prof
 
@@ -196,9 +195,9 @@ def mkprofile(confmng, sof_prof_template):
 
     for profile in profiles:
         key = profile.key
-        del confmng.sofia.profiles[key]
-        if key in confmng.sofia_status()['profiles']:
-            profile.stop()
+        del confmng.sofia.config.profiles[key]
+        if key in confmng.sofia.status()['profiles']:
+            confmng.sofia.stop(profile.key)
 
     confmng.commit()
 
@@ -247,8 +246,8 @@ def domain(fshost, confmng, domain_template):
     """A test domain using a template.
     """
     name = socket.gethostbyname(fshost)
-    confmng.directory[name] = domain_template
+    confmng.directory.config[name] = domain_template
     confmng.commit()
-    yield confmng.directory[name]
-    del confmng.directory[name]
+    yield confmng.directory.config[name]
+    del confmng.directory.config[name]
     confmng.commit()
