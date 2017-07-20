@@ -16,7 +16,7 @@ from .orms import buildfromschema
 from .schema import _sections, _apis
 
 
-log = logging.getLogger('sandswitches')
+log = logging.getLogger('conffs')
 
 
 class CLIError(Exception):

@@ -2,21 +2,21 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
-sandswitches: A Python ORM API for configuring and managing FreeSWITCH
-              configuration using Python data structures.
+conffs: A Python ORM API for configuring and managing FreeSWITCH
+        configuration using Python data structures.
 """
 import logging
 from .comms import get_ssh, get_sftp, get_pkey
 from .manage import manage_config, cli, CLIConnectionError, CLIError
 
 
-__package__ = 'sandswitches'
+__package__ = 'conffs'
 __version__ = '0.1.alpha'
 __author__ = ('Sangoma Technologies', 'tgoodlet@sangoma.com')
 __all__ = ['find_root', 'manage', 'manage_config']
 
 
-log = logging.getLogger('sandswitches')
+log = logging.getLogger('conffs')
 
 
 def find_root(ssh, fscli, runpath):

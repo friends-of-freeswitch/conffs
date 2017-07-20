@@ -6,7 +6,7 @@ import socket
 import pytest
 import logging
 import logging.config
-import sandswitches
+import conffs
 
 
 def pytest_addoption(parser):
@@ -102,7 +102,7 @@ def confmng(request, fshost):
     ``--fshost``.
     """
     keyfile = request.config.option.keyfile
-    return sandswitches.manage(fshost, keyfile=keyfile, cache_key_pw=True)
+    return conffs.manage(fshost, keyfile=keyfile, cache_key_pw=True)
 
 
 @pytest.fixture

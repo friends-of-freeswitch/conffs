@@ -10,7 +10,7 @@ from .orms import (
 )
 
 
-log = logging.getLogger('sandswitches')
+log = logging.getLogger('conffs')
 
 
 _sections = []

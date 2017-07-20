@@ -11,7 +11,7 @@ from copy import deepcopy
 from lxml import etree
 
 
-log = logging.getLogger('sandswitches')
+log = logging.getLogger('conffs')
 
 
 class EtreeMapper(object):

@@ -11,7 +11,7 @@ import paramiko
 from getpass import getpass
 
 
-log = logging.getLogger('sandswitches')
+log = logging.getLogger('conffs')
 
 
 SSH_OPTS = ['-o', 'UserKnownHostsFile=/dev/null',

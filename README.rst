@@ -1,6 +1,6 @@
-sandswitches
-============
-``sandswitches`` is a Python API for configuring `FreeSWITCH`_ by
+conffs
+======
+``conffs`` is a Python API for configuring `FreeSWITCH`_ by
 modifying its `XML configuration`_.
 
 Client code can for the most part modify the configuration using
@@ -10,7 +10,7 @@ Install
 -------
 ::
 
-    pip install git+git://github.com/sangoma/sandswitches.git
+    pip install git+git://github.com/friends-of-freeswitch/conffs.git
 
 
 API
@@ -21,10 +21,10 @@ is the same as modifying a standard data structure:
 .. code-block:: python
 
     import os
-    import sandswitches
+    import conffs
 
     # connect remote; you'll need ssh access and may have to unlock your key
-    confmng = sandswitches.manage(
+    confmng = conffs.manage(
         'megatron', keyfile=os.path.expanduser('~') + '/.ssh/id_rsa')
 
     confmng.sofia['profiles']['internal']['settings']['sip-port'] = '5069'
@@ -124,7 +124,7 @@ the data formatting:
 
 Supported config sections
 -------------------------
-``sandswitches`` uses `object-relational mappings`_
+``conffs`` uses `object-relational mappings`_
 to transform XML *patterns* in the FreeSWITCH config files into simple data
 structures. Since each section uses a heterogeneous (read not consistent) set
 of patterns, object relations need to be manually specified through a small
@@ -148,18 +148,18 @@ built in event system.
 Extending to more sections
 **************************
 We'd absolutely love to see the entire core config mapped out for use in
-``sandswitches``. Currently we've only added what we've needed. If
+``conffs``. Currently we've only added what we've needed. If
 there's a section missing that you need please feel free to open an issue.
 
-If you want to extend ``sandswitches`` to include your section of choice
-take a look at the ``sandswitches.schema`` module and see if
+If you want to extend ``conffs`` to include your section of choice
+take a look at the ``conffs.schema`` module and see if
 you can figure out how to write your own section *schema*. We'll
 hopefully have a better write up on this in the near future.
 
 
 Caveats
 -------
-In order to simplify XML processing ``sandswitches`` collapses the
+In order to simplify XML processing ``conffs`` collapses the
 target FreeSWITCH server's XML config to a single master ``freeswitch.xml``.
 The original will be backed up with an appropriate time-date suffix which can
 renamed back to ``freeswitch.xml`` at any time if you want to revert to
@@ -172,6 +172,6 @@ the original multi-file state.
 .. _XML configuration:
     https://freeswitch.org/confluence/display/FREESWITCH/Configuring+FreeSWITCH#ConfiguringFreeSWITCH-ConfigurationFiles
 .. _switchy:
-    https://github.com/sangoma/switchy
+    https://github.com/friends-of-freeswitch/switchy
 .. _object-relational mappings:
     https://en.wikipedia.org/wiki/Object-relational_mapping
