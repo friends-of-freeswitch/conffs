@@ -13,19 +13,19 @@ with open('README.rst') as f:
 
 
 setup(
-    name="sandswitches",
+    name="conffs",
     version='0.1.0.alpha',
-    description='A Python API that makes configuring FreeSWITCH a lunch break',
+    description='A Python API for configuring FreeSWITCH',
     long_description=readme,
     license='Mozilla',
     author='Sangoma Technologies',
     author_email='qa@eng.sangoma.com',
     maintainer='Tyler Goodlet',
-    maintainer_email='tgoodlet@sangoma.com',
-    url='https://github.com/sangoma/sandswitches',
+    maintainer_email='tgoodlet@gmail.com',
+    url='https://github.com/friends-of-freeswitch/conffs',
     platforms=['linux'],
     packages=[
-        'sandswitches',
+        'conffs',
     ],
     entry_points={
         'console_scripts': []

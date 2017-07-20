@@ -9,15 +9,14 @@ import logging
 import os
 import tempfile
 from io import BytesIO
-from collections import namedtuple
 from lxml import etree
 from plumbum import ProcessExecutionError
 from .utils import RestoreFile
 from .orms import buildfromschema
-from .schema import _models
+from .schema import _sections, _apis
 
 
-log = logging.getLogger('sandswitches')
+log = logging.getLogger('conffs')
 
 
 class CLIError(Exception):
@@ -75,7 +74,7 @@ class cli(object):
         return self('eval', expr)
 
 
-class ConfigManager(object):
+class Client(object):
     '''Manages a collection of restorable XML objects discovered in the
     FreeSWITCH config directories.
     '''
@@ -114,67 +113,6 @@ class ConfigManager(object):
         log.debug("freeswitch.xml commit took {} seconds"
                   .format(time.time() - now))
 
-    def sofia_status(self):
-        """Return status data from sofia in a nicely organized dict.
-        """
-        # remove '===' "lines"
-        lines = [
-            line for line in self.fscli('sofia', 'status').splitlines()
-            if '===' not in line]
-        # pop summary line
-        lines.pop(-1)
-
-        # build component to status maps
-        profiles = {}
-        gateways = {}
-        aliases = {}
-
-        colnames = [name.lower() for name in lines.pop(0).split()]
-        iname = colnames.index('name')
-        colnames.remove('name')
-        for line in lines:
-            fields = [field.strip() for field in line.split('\t')]
-            name = fields.pop(iname)
-            row = {k.lower(): v for k, v in zip(colnames, fields)}
-            tp = row.pop('type')
-            if tp == 'profile':
-                profiles[name] = row
-            elif tp == 'gateway':
-                profname, gwname = name.split("::")
-                row['profile'] = profname
-                gateways[gwname] = row
-            elif tp == 'alias':
-                aliases[name] = row
-
-        return {'profiles': profiles, 'gateways': gateways, 'aliases': aliases}
-
-    def get_users(self, **kwargs):
-        """Return all directory users in a map keyed by domain name.
-        """
-        args = []
-        allowed = ('domain', 'group', 'user', 'context')
-        for argname, value in kwargs.items():
-            if argname not in allowed:
-                raise ValueError(
-                    '{} is not a valid argument to list_users'.format(
-                        argname)
-                )
-            args.append('{} {}'.format(argname, value))
-
-        # last two lines are entirely useless
-        res = self.cli('list_users', *args).splitlines()[:-2]
-        UserEntry = namedtuple("UserEntry", res[0].split('|'))
-        # collect and pack all users
-        users = []
-        for row in res[1:]:
-            users.append(UserEntry(*row.split('|')))
-
-        # pack users by domain
-        domains = {}
-        for user in users:
-            domains.setdefault(user.domain, []).append(user)
-
-        return domains
 
 
 def manage_config(rootpath, sftp, fscli, log, singlefile=True):
@@ -222,17 +160,30 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
         with sftp.open(confpath, 'w') as fxml:
             fxml.write(etree.tostring(tree, pretty_print=True))
 
-    mng = ConfigManager(
+    client = Client(
         RestoreFile(confpath, open=sftp.open if sftp else open),
         tree, sftp, fscli, log
     )
 
-    # apply section mapped models as attrs
-    for f, cls in _models:
-        section = buildfromschema(
-            cls, getattr(cls, 'schema', None), root=mng.root,
-            log=log, confmng=mng
-        )
-        setattr(mng, section.name, section)
+    class Api(object):
+        "Module api placeholder"
+        def __init__(self, client):
+            self.client = client
 
-    return mng
+    # apply section mapped apis/models as attrs
+    for f, cls in _sections:
+        modname = cls.modeldata['modname']
+        api = _apis.get(modname)
+        if api:
+            module = api(client)
+        else:
+            module = Api(client)
+
+        setattr(client, modname, module)
+        section = buildfromschema(
+            cls, getattr(cls, 'schema', None), root=client.root,
+            log=log, client=client
+        )
+        setattr(module, 'config', section)
+
+    return client

@@ -32,22 +32,22 @@ def test_reg_to_user(fshost, domain, confmng, mkprofile):
         int(client['settings']['sip-port']) - 1)
     registrar['domains']['test'] = {'parse': 'false', 'aliase': 'true'}
     confmng.commit()
-    registrar.start()
-    client.start()
+    confmng.sofia.start(registrar.key)
+    confmng.sofia.start(client.key)
 
     # register the client gateway to our 'doggy' user
-    client.register('doggy')
+    confmng.sofia.register(client.key, 'doggy')
 
     # assert the reg was successful
     start = time.time()
     while time.time() - start < 5:
-        if confmng.sofia_status()['gateways']['doggy']['state'] == 'REGED':
+        if confmng.sofia.status()['gateways']['doggy']['state'] == 'REGED':
             break
         time.sleep(0.1)
     else:
-        assert confmng.sofia_status()['gateways']['doggy']['state'] == 'REGED'
+        assert confmng.sofia.status()['gateways']['doggy']['state'] == 'REGED'
 
     # TODO: maybe make a call from the client?
 
     # teardown
-    client.unregister('doggy')
+    confmng.sofia.unregister(client.key, 'doggy')

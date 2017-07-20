@@ -9,7 +9,7 @@ import time
 
 
 def test_event_socket(confmng):
-    settings = confmng.event_socket['settings']
+    settings = confmng.event_socket.config['settings']
     pw = settings['password']
     settings['password'] = 'doggy'
     confmng.commit()
