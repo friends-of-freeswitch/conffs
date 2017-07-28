@@ -40,8 +40,9 @@ def test_sofia_profile_aliases(profile, confmng):
     assert name in confmng.sofia.status()['aliases']
     time.sleep(0.5)
     confmng.sofia.stop(profile.key)
-    profile['aliases'].insert(0, 'yourprofile')
-    profile['aliases'].insert(1, '2yourprofile')
+    aliases = profile['aliases']
+    aliases.insert(0, 'yourprofile')
+    aliases.insert(1, '2yourprofile')
     assert ('yourprofile', '2yourprofile', name) == tuple(
             profile['aliases'])
     time.sleep(2)  # attempt to avoid a profile restart race/bug in FS

@@ -101,7 +101,7 @@ class EtreeMapper(object):
     def printxml(self):
         """Print the this mapping as rendered XML to stdout.
         """
-        print(self.toxmlstring())
+        print(self.toxmlstring().decode())
 
     def __deepcopy__(self, memo):
         return self.fromelem(self.key, deepcopy(self.elem))
@@ -178,7 +178,7 @@ class ElemList(Sequence):
         self._subelems[index].attrib[self.attrname] = value
 
     def __delitem__(self, index):
-        del self._subelems[index]
+        del self.parent[index]
 
     def __len__(self):
         return len(self._subelems)
