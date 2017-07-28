@@ -1,0 +1,18 @@
+sudo: required
+services:
+    - docker
+
+language: python
+python:
+    - '2.7'
+    - '3.5'
+    - '3.6'
+    # - pypy
+    - nightly
+
+install:
+  # - pip install -U tox
+  - pip install . -r requirements-test.txt
+
+script:
+  - pytest --use-docker tests/
