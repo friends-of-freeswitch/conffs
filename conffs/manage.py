@@ -7,8 +7,6 @@ Config management API and helpers.
 import time
 import logging
 import os
-import tempfile
-from io import BytesIO
 from lxml import etree
 from plumbum import ProcessExecutionError
 from .utils import RestoreFile
@@ -34,14 +32,22 @@ class cli(object):
     CLIError = CLIError
     CLIConnectionError = CLIConnectionError
 
-    def __init__(self, ssh, *args, **kwargs):
-        self.ssh = ssh
-        self._cli = self.get_cli(*args, **kwargs)
+    def __init__(self, shell, *args, **kwargs):
+        self.shell = shell
+        prefix = kwargs.pop('prefix', None)
+        self.prefix = prefix
+        self._cmd = self.get_cmd(prefix=prefix, *args, **kwargs)
 
-    def get_cli(self, *args, **kwargs):
+    def get_cmd(self, *args, **kwargs):
         """Build and return an ``fs_cli`` command instance.
         """
-        cli = self.ssh['fs_cli']
+        cli = self.shell
+        prefix = kwargs.pop('prefix', None)
+        if prefix:
+            for item in prefix:
+                cli = cli[item]
+
+        cli = cli['fs_cli']
         for arg in args:
             cli = cli['--{}'.format(arg)]
 
@@ -54,7 +60,7 @@ class cli(object):
         '''Invoke an `fs_cli` command and return output with error handling.
         '''
         try:
-            out = self._cli(' '.join(map(str, tokens))).strip()
+            out = self._cmd(' '.join(map(str, tokens))).strip()
         except ProcessExecutionError as err:
             raise CLIConnectionError(str(err))
 
@@ -78,11 +84,11 @@ class Client(object):
     '''Manages a collection of restorable XML objects discovered in the
     FreeSWITCH config directories.
     '''
-    def __init__(self, rfile, etree, sftp, fscli, log):
+    def __init__(self, rfile, etree, conf_io, fscli, log):
         self.etree = etree
         self.root = etree.getroot()
         self.file = rfile
-        self.sftp = sftp
+        self.conf_io = conf_io
         self.cli = fscli
         self.log = log
         self._touched = []
@@ -104,34 +110,21 @@ class Client(object):
         """
         now = time.time()
         self.log.info("saving '{}'".format(self.file.path))
-        # write local copy
-        self.sftp.putfo(
-            BytesIO(etree.tostring(self.etree, pretty_print=True)),
-            self.file.path
-        )
+        self.conf_io.write(etree.tostring(self.etree, pretty_print=True))
         self.fscli('reloadxml')
         log.debug("freeswitch.xml commit took {} seconds"
                   .format(time.time() - now))
 
 
-
-def manage_config(rootpath, sftp, fscli, log, singlefile=True):
+def manage_config(confpath, conf_io, fscli, log, singlefile=True):
     """Manage the FreeSWITCH configuration found at ``rootpath`` or as
     auto-discovered using ``fs_cli`` over ssh. By default all XML configs are
     squashed down to a single ``freeswitch.xml`` file.
     """
     parser = etree.XMLParser(remove_blank_text=True)
-    confpath = os.path.join(rootpath, 'freeswitch.xml')
 
-    # copy to a local path and parse for speed
     start = time.time()
-    _, localpath = tempfile.mkstemp(
-        prefix='{}-freeswitch-'.format(fscli.ssh._fqhost),
-        suffix='.xml',
-    )
-    with open(localpath, 'wb') as fxml:  # open as bytes
-        sftp.getfo(confpath, fxml)
-    with open(localpath, 'r') as fxml:
+    with conf_io.open() as fxml:
         tree = etree.parse(fxml, parser)
     log.info("Parsing {} into an etree took {} seconds".format(
         confpath, time.time() - start))
@@ -155,14 +148,14 @@ def manage_config(rootpath, sftp, fscli, log, singlefile=True):
         # back up original freeswitch.xml root config
         backup = confpath + time.strftime('_backup_%Y-%m-%d-%H-%M-%S')
         log.info("Backing up old {} as {}...".format(confpath, backup))
-        sftp.rename(confpath, backup)
+        conf_io.copy(backup)
 
-        with sftp.open(confpath, 'w') as fxml:
-            fxml.write(etree.tostring(tree, pretty_print=True))
+        with conf_io.open('w') as fxml:
+            fxml.write(etree.tostring(tree, pretty_print=True).decode())
 
     client = Client(
-        RestoreFile(confpath, open=sftp.open if sftp else open),
-        tree, sftp, fscli, log
+        RestoreFile(confpath, open=conf_io.open),
+        tree, conf_io, fscli, log
     )
 
     class Api(object):

@@ -9,8 +9,11 @@ import time
 
 
 @pytest.fixture
-def profile(mkprofile):
-    return mkprofile('doggy')
+def profile(confmng, mkprofile):
+    profile = mkprofile('doggy')
+    yield profile
+    confmng.sofia.stop(profile.key)
+    time.sleep(1)
 
 
 def test_read_sofia_section(confmng):
@@ -37,14 +40,22 @@ def test_sofia_profile_aliases(profile, confmng):
     assert name in confmng.sofia.status()['aliases']
     time.sleep(0.5)
     confmng.sofia.stop(profile.key)
-    profile['aliases'].insert(0, 'yourprofile')
-    profile['aliases'].insert(1, '2yourprofile')
+    aliases = profile['aliases']
+    aliases.insert(0, 'yourprofile')
+    aliases.insert(1, '2yourprofile')
     assert ('yourprofile', '2yourprofile', name) == tuple(
             profile['aliases'])
-    time.sleep(0.5)
+    time.sleep(2)  # attempt to avoid a profile restart race/bug in FS
     confmng.sofia.start(profile.key)
     # FIXME: only the last alias is used? bug?
     assert name in confmng.sofia.status()['aliases']
+
+    # verify removal
+    del aliases[0]
+    assert 'yourprofile' not in aliases
+    for key in tuple(aliases):
+        aliases.remove(key)
+    assert not aliases
 
 
 def test_sofia_profile_gateway(profile, confmng):

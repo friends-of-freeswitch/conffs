@@ -15,11 +15,11 @@ class RestoreFile(object):
         self.open = open
 
     def _readfile(self, path):
-        with self.open(path, 'r') as fp:
+        with self.open('r') as fp:
             return fp.read()
 
     def _writefile(self, path, contents):
-        with self.open(path, 'w') as fp:
+        with self.open('w') as fp:
             fp.write(contents)
 
     def read(self):

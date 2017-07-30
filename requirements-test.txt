@@ -1,0 +1,5 @@
+pytest
+colorlog
+
+# pytest-dockerctl for container mgmt
+-e git+git://github.com/tgoodlet/pytest-dockerctl.git#egg=pytest-dockerctl

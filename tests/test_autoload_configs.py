@@ -19,15 +19,15 @@ def test_event_socket(confmng):
         confmng.cli('status')
 
     # we've locked ourself out by changing the password so get a new cli
-    oldcli = confmng.cli._cli
-    cli = confmng.cli.get_cli(password='doggy')
-    assert cli('status')
+    oldcmd = confmng.cli._cmd
+    cmd = confmng.cli.get_cmd(password='doggy', prefix=confmng.cli.prefix)
+    assert cmd('status')
     settings['password'] = pw
-    confmng.cli._cli = cli
+    confmng.cli._cmd = cmd
     confmng.commit()
-    cli('reload mod_event_socket')
+    cmd('reload mod_event_socket')
 
     # verify the old cli command works again
     time.sleep(0.5)
-    confmng.cli._cli = oldcli
+    confmng.cli._cmd = oldcmd
     assert confmng.cli('status')

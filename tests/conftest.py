@@ -1,7 +1,9 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+import os
 import sys
+import shutil
 import socket
 import pytest
 import logging
@@ -13,14 +15,18 @@ def pytest_addoption(parser):
     '''Add server options for pointing to the engine we will use for testing
     '''
     parser.addoption("--fshost", action="store", dest='fshost',
-                     default='127.0.0.1',
+                     default=None,
                      help="FreeSWITCH server's hostname")
     parser.addoption("--keyfile", action="store", dest='keyfile',
-                     default=None, required=True,
+                     default=None,
                      help="Path to ssh private key")
     parser.addoption("--loglevel", action="store", dest='loglevel',
                      default='INFO',
                      help="Global log level to use during testing.")
+    parser.addoption("--use-docker", action="store_true", dest='usedocker',
+                     help="Toggle use of docker containers for testing")
+    parser.addoption("--num-containers", action="store", dest='ncntrs',
+                     default=1, help="Number of docker containers to spawn")
 
 
 DATEFMT = '%b %d %H:%M:%S'
@@ -76,17 +82,65 @@ def loglevel(request):
 
 
 @pytest.fixture(scope='session')
+def confdir():
+    """Configure and return the configuration directory
+    """
+    dirname = os.path.dirname
+    dirpath = os.path.abspath(
+        os.path.join(
+            dirname(dirname(os.path.realpath(__file__))),
+            'configs/ci-minimal/'
+        )
+    )
+
+    # ensure the "original" freeswitch.xml template is used
+    orig = os.path.join(dirpath, 'freeswitch.xml.orig')
+    shutil.copy(orig, os.path.join(dirpath, 'freeswitch.xml'))
+    yield dirpath
+    shutil.copy(orig, os.path.join(dirpath, 'freeswitch.xml'))
+
+
+@pytest.fixture(scope='session')
+def containers(request, confdir):
+    """Return a sequence of docker containers.
+    """
+    if request.config.option.usedocker:
+        docker = request.getfixturevalue('dockerctl')
+        with docker.run(
+            'safarov/freeswitch',
+            volumes={confdir: {'bind': '/etc/freeswitch/'}},
+            num=request.config.option.ncntrs
+        ) as containers:
+            yield containers
+    else:
+        pytest.skip(
+            "You must specify `--use-docker` to activate containers"
+        )
+
+
+@pytest.fixture(scope='session')
 def fshosts(request):
     '''Return the FS test server hostnames passed via the
-    `--fshost` cmd line arg.
+    ``--fshost`` cmd line arg.
     '''
     argstring = request.config.option.fshost
-    if not argstring:
-        pytest.skip("the '--fshost' option is required to determine the "
-                    "FreeSWITCH slave server(s) to connect to for testing")
-    # construct a list if passed as arg
-    fshosts = argstring.split(',')
-    return fshosts
+    addrs = []
+
+    if argstring:
+        # construct a list if passed as arg
+        fshosts = argstring.split(',')
+        yield fshosts
+
+    elif request.config.option.usedocker:
+        containers = request.getfixturevalue('containers')
+        for container in containers:
+            addrs.append(container.attrs['NetworkSettings']['IPAddress'])
+        yield addrs
+
+    else:
+        pytest.skip("the '--fshost' or '--use-docker` options are required "
+                    "to determine the FreeSWITCH server(s) to connect "
+                    "to for testing")
 
 
 @pytest.fixture(scope='session')
@@ -97,12 +151,26 @@ def fshost(fshosts):
 
 
 @pytest.fixture(scope='session')
-def confmng(request, fshost):
+def confmng(request, fshost, confdir):
     """ConfigManager instance loaded for the FreeSWITCH process running at
     ``--fshost``.
     """
-    keyfile = request.config.option.keyfile
-    return conffs.manage(fshost, keyfile=keyfile, cache_key_pw=True)
+    kwargs = {}
+    option = request.config.option
+    keyfile = option.keyfile
+    if option.usedocker:
+        mode = 'local'
+        kwargs['confdir'] = confdir
+        kwargs['docker'] = True
+        cntr = request.getfixturevalue('containers')[0]
+        kwargs['container_id'] = cntr.attrs['Id']
+    else:
+        mode = 'ssh'
+        kwargs['host'] = fshost
+        kwargs['keyfile'] = keyfile
+        kwargs['cache_key_pw'] = True
+
+    return conffs.manage(mode, **kwargs)
 
 
 @pytest.fixture
